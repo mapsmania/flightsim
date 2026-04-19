@@ -94,29 +94,29 @@
                     }
                 },
                 layers: [
-                    {
-                        id: 'osm',
-                        type: 'raster',
-                        source: 'osm'
-                    },
-                    {
-                        id: 'hills',
-                        type: 'hillshade',
-                        source: 'hillshadeSource',
-                        paint: {
-                            'hillshade-shadow-color': '#473B24'
-                        }
-                    }
-                ],
-                terrain: {
-                    source: 'terrainSource',
-                    exaggeration: 1.8
-                },
-                sky: {
-                    'sky-type': 'atmosphere',
-                    'sky-atmosphere-sun': [0.0, 90.0],
-                    'sky-atmosphere-sun-intensity': 15
-                }
+    {
+        id: 'osm',
+        type: 'raster',
+        source: 'osm'
+    },
+    {
+        id: 'hills',
+        type: 'hillshade',
+        source: 'hillshadeSource',
+        paint: {
+            'hillshade-shadow-color': '#473B24'
+        }
+    },
+    {
+        id: 'sky',
+        type: 'sky',
+        paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 90.0],
+            'sky-atmosphere-sun-intensity': 15
+        }
+    }
+]
             }
         });
 
