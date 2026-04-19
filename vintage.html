@@ -1,55 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="utf-8" />
-    <title>Allmaps Vintage Terrain - Freiburg</title>
-    <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet" />
-    
-    <script type="importmap">
-    {
-      "imports": {
-        "@allmaps/maplibre": "https://unpkg.com/@allmaps/maplibre?module",
-        "@allmaps/render": "https://unpkg.com/@allmaps/render@1.0.0-beta.42/dist/index.js"
-      }
+  <meta charset="utf-8" />
+  <title>Roy's Military Map 1747-1752</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+  <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    .map-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 8px;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
-    </script>
 
-    <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #111; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
-        canvas { filter: sepia(0.5) contrast(1.1) brightness(0.9); }
-    </style>
+    h2 { margin: 0 0 10px 0; font-size: 18px; color: #333; }
+    p { font-size: 13px; line-height: 1.5; color: #555; }
+    
+    .slider-container {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+
+    label { font-size: 12px; font-weight: bold; display: block; margin-bottom: 5px; }
+    input[type=range] { width: 100%; cursor: pointer; }
+  </style>
 </head>
-<body>
 
+<body>
 <div id="map"></div>
 
-<script type="module">
-    // Now we can import the name we defined in the importmap above
-    import { WarpedMapLayer } from '@allmaps/maplibre';
+<div class="map-overlay">
+  <h2>Roy Highlands Survey</h2>
+  <p>
+    Commissioned after the 1745 Jacobite Rising, <strong>Major-General William Roy's</strong> 
+    survey (1747–52) was the first systematic mapping of the Scottish Highlands. 
+  </p>
+  <p>
+    Known as the "Great Map," it captured the landscape in incredible hand-drawn detail 
+    just before the Industrial Revolution and the Highland Clearances.
+  </p>
+  
+  <div class="slider-container">
+    <label>Historic Layer Opacity</label>
+    <input id="slider" type="range" min="0" max="1" step="0.05" value="0.85">
+  </div>
+</div>
 
-    const map = new maplibregl.Map({
-        container: 'map',
-        style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
-        center: [7.8522, 47.9990],
-        zoom: 11.5,
-        maxPitch: 0 // Allmaps works best without pitch
-    });
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
+  center: [-4.4244, 57.3228],
+  zoom: 12,
+  minZoom: 5,
+  maxZoom: 14,
+  pitch: 60,
+  bearing: 0
+});
 
-    const annotationUrl = 'https://annotations.allmaps.org/manifests/a0d6d3379cfd9f0a';
+map.on('load', () => {
 
-    map.on('load', async () => {
-        const warpedMapLayer = new WarpedMapLayer();
-        map.addLayer(warpedMapLayer);
-        
-        try {
-            await warpedMapLayer.addGeoreferenceAnnotationByUrl(annotationUrl);
-            console.log("Freiburg Historical Map Loaded!");
-        } catch (err) {
-            console.error("Failed to load map:", err);
-        }
-    });
+  // 1. Terrain (DEM)
+  map.addSource('terrain-dem', {
+    type: 'raster-dem',
+    url: 'https://tiles.mapterhorn.com/tilejson.json',
+    encoding: 'terrarium',
+    attribution: 'Terrain by Mapterhorn'
+  });
+
+  map.setTerrain({
+    source: 'terrain-dem',
+    exaggeration: 1.5
+  });
+
+  // 2. Historic raster layer
+  map.addSource('highlands', {
+    type: 'raster',
+    tiles: [
+      'https://mapseries-tilesets.s3.amazonaws.com/roy/highlands/{z}/{x}/{y}.png'
+    ],
+    tileSize: 256,
+    attribution: '© <a href="https://maps.nls.uk/roy/" target="_blank">National Library of Scotland</a>'
+  });
+
+  map.addLayer({
+    id: 'highlands-layer',
+    type: 'raster',
+    source: 'highlands',
+    paint: {
+      'raster-opacity': 0.85
+    }
+  });
+
+  // 3. Opacity slider
+  document.getElementById('slider').addEventListener('input', (e) => {
+    map.setPaintProperty(
+      'highlands-layer',
+      'raster-opacity',
+      parseFloat(e.target.value)
+    );
+  });
+
+});
 </script>
+
 </body>
 </html>
