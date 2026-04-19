@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Flight Sim Lite</title>
+
+    <!-- MapLibre -->
+    <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: black;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* Simple cockpit HUD */
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ffcc;
+            font-family: monospace;
+            font-size: 14px;
+            background: rgba(0,0,0,0.4);
+            padding: 8px 10px;
+            border-radius: 6px;
+        }
+
+        #help {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 12px;
+            background: rgba(0,0,0,0.4);
+            padding: 6px 8px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <div id="hud"></div>
+
+    <div id="help">
+        ↑ ↓ speed | ← → turn | W/S pitch
+    </div>
+
+    <script type="module">
+        import FlightController from './FlightController.js';
+
+        // Create map
+        const map = new maplibregl.Map({
+            container: 'map',
+            hash: true,
+
+            center: [8.0587, 46.4768], // Alps
+            zoom: 11.7,
+            pitch: 60,
+            bearing: -18.6,
+
+            style: {
+                version: 8,
+                sources: {
+                    osm: {
+                        type: 'raster',
+                        tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '&copy; OpenStreetMap Contributors',
+                        maxzoom: 19
+                    },
+                    terrainSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    },
+                    hillshadeSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    }
+                },
+                layers: [
+                    {
+                        id: 'osm',
+                        type: 'raster',
+                        source: 'osm'
+                    },
+                    {
+                        id: 'hills',
+                        type: 'hillshade',
+                        source: 'hillshadeSource',
+                        paint: {
+                            'hillshade-shadow-color': '#473B24'
+                        }
+                    }
+                ],
+                terrain: {
+                    source: 'terrainSource',
+                    exaggeration: 1.8
+                },
+                sky: {
+                    'sky-type': 'atmosphere',
+                    'sky-atmosphere-sun': [0.0, 90.0],
+                    'sky-atmosphere-sun-intensity': 15
+                }
+            }
+        });
+
+        // Wait for map load
+        map.on('load', () => {
+            const flight = new FlightController(map, {
+                speed: 0.0005,
+                pitch: 60,
+                bearing: -18.6
+            });
+
+            flight.start();
+
+            // HUD update loop
+            function updateHUD() {
+                document.getElementById('hud').innerHTML = `
+                    Speed: ${flight.speed.toFixed(5)}<br>
+                    Bearing: ${flight.bearing.toFixed(1)}<br>
+                    Pitch: ${flight.pitch.toFixed(1)}
+                `;
+                requestAnimationFrame(updateHUD);
+            }
+
+            updateHUD();
+        });
+    </script>
+</body>
+</html>
