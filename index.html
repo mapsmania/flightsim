@@ -96,11 +96,6 @@ map.on('load', () => {
         }
     });
 
-    map.setFog({
-        range: [0.5, 10],
-        color: '#dbe9f4',
-        'horizon-blend': 0.2
-    });
 
     // 👇 assign to outer variable
     flight = new FlightController(map, {
