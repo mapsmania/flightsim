@@ -71,7 +71,7 @@ const map = new maplibregl.Map({
     style: 'https://tiles.openfreemap.org/styles/liberty',
     center: [8.0587, 46.4768],
     zoom: 8,
-    pitch: 75,
+    pitch: 65,
     bearing: -18.6
 });
 
@@ -84,7 +84,7 @@ map.on('load', () => {
 
     map.setTerrain({
         source: 'terrainSource',
-        exaggeration: 2.0
+        exaggeration: 1.2
     });
 
     map.addLayer({
@@ -100,7 +100,7 @@ map.on('load', () => {
     // 👇 assign to outer variable
     flight = new FlightController(map, {
         speed: 0.001,
-        pitch: 75,
+        pitch: 65,
         bearing: -18.6
     });
 
