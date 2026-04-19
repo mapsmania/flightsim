@@ -61,79 +61,75 @@
         ↑ ↓ speed | ← → turn | W/S pitch
     </div>
 
-    <script type="module">
-        import FlightController from './FlightController.js';
+<script type="module">
+import FlightController from './FlightController.js';
 
-        // Create map
-        const map = new maplibregl.Map({
-            container: 'map',
-            hash: true,
+let flight; // 👈 make it accessible everywhere
 
-            center: [8.0587, 46.4768], // Alps
-            zoom: 11.7,
-            pitch: 60,
-            bearing: -18.6,
+const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [13.388, 52.517],
+    zoom: 9.5,
+    pitch: 60,
+    bearing: -18.6
+});
 
-            style: {
-                version: 8,
-                sources: {
-                    osm: {
-                        type: 'raster',
-                        tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                        tileSize: 256,
-                        attribution: '&copy; OpenStreetMap Contributors',
-                        maxzoom: 19
-                    },
-                    terrainSource: {
-                        type: 'raster-dem',
-                        url: 'https://tiles.mapterhorn.com/tilejson.json'
-                    },
-                    hillshadeSource: {
-                        type: 'raster-dem',
-                        url: 'https://tiles.mapterhorn.com/tilejson.json'
-                    }
-                },
-                layers: [
-    {
-        id: 'osm',
-        type: 'raster',
-        source: 'osm'
-    },
-    {
+map.on('load', () => {
+
+    map.addSource('terrainSource', {
+        type: 'raster-dem',
+        url: 'https://tiles.mapterhorn.com/tilejson.json'
+    });
+
+    map.setTerrain({
+        source: 'terrainSource',
+        exaggeration: 1.8
+    });
+
+    map.addLayer({
         id: 'hills',
         type: 'hillshade',
-        source: 'hillshadeSource',
+        source: 'terrainSource',
         paint: {
             'hillshade-shadow-color': '#473B24'
         }
-    },
-    
-]
-            }
-        });
+    });
 
-        // Wait for map load
-        map.on('load', () => {
-            const flight = new FlightController(map, {
-                speed: 0.0005,
-                pitch: 60,
-                bearing: -18.6
-            });
+    map.setFog({
+        range: [0.5, 10],
+        color: '#dbe9f4',
+        'horizon-blend': 0.2
+    });
 
-            flight.start();
+    // 👇 assign to outer variable
+    flight = new FlightController(map, {
+        speed: 0.0005,
+        pitch: 60,
+        bearing: -18.6
+    });
 
-            // HUD update loop
-            function updateHUD() {
-                document.getElementById('hud').innerHTML = `
-                    Speed: ${flight.speed.toFixed(5)}<br>
-                    Bearing: ${flight.bearing.toFixed(1)}<br>
-                    Pitch: ${flight.pitch.toFixed(1)}
-                `;
-                requestAnimationFrame(updateHUD);
-            }
+    flight.start();
 
-            updateHUD();
-        });
-    </script>
+    // Start HUD AFTER flight exists
+    updateHUD();
+});
+
+// HUD loop
+function updateHUD() {
+    if (!flight) {
+        requestAnimationFrame(updateHUD);
+        return;
+    }
+
+    document.getElementById('hud').innerHTML = `
+        Speed: ${flight.speed.toFixed(5)}<br>
+        Bearing: ${flight.bearing.toFixed(1)}<br>
+        Pitch: ${flight.pitch.toFixed(1)}
+    `;
+
+    requestAnimationFrame(updateHUD);
+}
+</script>
 </body>
 </html>
