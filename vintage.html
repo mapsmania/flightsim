@@ -1,63 +1,55 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@allmaps/maplibre</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.skypack.dev/maplibre-gl@4.0.2/dist/maplibre-gl.css"
-      type="text/css"
-    />
-    <link rel="stylesheet" href="style.css" type="text/css" />
-    <script src="controls.js"></script>
-  </head>
-  <body>
-    <div id="map"></div>
-    <div id="controls"></div>
-    <script type="module">
-      import {
-        Map,
-        NavigationControl
-      } from 'https://cdn.skypack.dev/maplibre-gl@4.0.2'
+    <title>Allmaps Vintage Terrain - Freiburg</title>
+    <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "@allmaps/maplibre": "https://unpkg.com/@allmaps/maplibre?module",
+        "@allmaps/render": "https://unpkg.com/@allmaps/render@1.0.0-beta.42/dist/index.js"
+      }
+    }
+    </script>
 
-      import { WarpedMapLayer } from 'https://unpkg.com/@allmaps/maplibre?module'
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #111; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        canvas { filter: sepia(0.5) contrast(1.1) brightness(0.9); }
+    </style>
+</head>
+<body>
 
-      const map = new Map({
+<div id="map"></div>
+
+<script type="module">
+    // Now we can import the name we defined in the importmap above
+    import { WarpedMapLayer } from '@allmaps/maplibre';
+
+    const map = new maplibregl.Map({
         container: 'map',
         style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
-        center: [-73.9337, 40.8011],
+        center: [7.8522, 47.9990],
         zoom: 11.5,
-        maxPitch: 0
-      })
+        maxPitch: 0 // Allmaps works best without pitch
+    });
 
-      let mapLoaded = false
-      let nav = new NavigationControl()
-      map.addControl(nav, 'top-left')
+    const annotationUrl = 'https://annotations.allmaps.org/manifests/a0d6d3379cfd9f0a';
 
-      const warpedMapLayer = new WarpedMapLayer()
-      const annotationUrl =
-        'https://annotations.allmaps.org/images/d180902cb93d5bf2'
-
-      map.on('load', async () => {
-        mapLoaded = true
-        map.addLayer(warpedMapLayer)
-        await warpedMapLayer.addGeoreferenceAnnotationByUrl(annotationUrl)
-      })
-
-      async function handleAddMapClicked() {
-        if (mapLoaded) {
-          await warpedMapLayer.addGeoreferenceAnnotationByUrl(
-            'https://annotations.allmaps.org/maps/3c72848762664ecd'
-          )
-
-          map.fitBounds(warpedMapLayer.getBounds())
+    map.on('load', async () => {
+        const warpedMapLayer = new WarpedMapLayer();
+        map.addLayer(warpedMapLayer);
+        
+        try {
+            await warpedMapLayer.addGeoreferenceAnnotationByUrl(annotationUrl);
+            console.log("Freiburg Historical Map Loaded!");
+        } catch (err) {
+            console.error("Failed to load map:", err);
         }
-      }
-
-      if (window.initializeControls) {
-        initializeControls('controls.html', warpedMapLayer, handleAddMapClicked)
-      }
-    </script>
-  </body>
+    });
+</script>
+</body>
 </html>
