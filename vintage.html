@@ -55,8 +55,11 @@
   <div class="slider-container">
     <label>Historic Layer Opacity</label>
     <input id="slider" type="range" min="0" max="1" step="0.05" value="0.85">
+    <label>Terrain Depth</label>
+    <input id="terrain-slider" type="range" min="0" max="3" step="0.1" value="1.5">
+  
   </div>
-
+  
     <div style="text-align: center; margin-top: 15px;">
   <a href="https://googlemapsmania.blogspot.com/2026/04/the-first-systematic-survey-meets.html" 
      target="_blank" 
@@ -120,6 +123,13 @@ map.on('load', () => {
       parseFloat(e.target.value)
     );
   });
+
+  document.getElementById('terrain-slider').addEventListener('input', (e) => {
+  map.setTerrain({
+    source: 'terrain-dem',
+    exaggeration: parseFloat(e.target.value)
+  });
+});  
 
 });
 </script>
