@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Terrain Marble – Cinematic Camera Modes</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+
+<link href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-contour@0.0.5/dist/index.min.js"></script>
+
+<style>
+html,body{margin:0;height:100%;overflow:hidden;font-family:Arial}
+#map{position:absolute;inset:0}
+
+.panel{
+  position:absolute;top:12px;left:12px;z-index:10;
+  width:320px;background:rgba(255,255,255,0.92);
+  padding:14px;border-radius:12px;
+  box-shadow:0 10px 28px rgba(0,0,0,.2)
+}
+
+h2{margin:0 0 8px;font-size:18px}
+p{font-size:13px;margin:0 0 10px}
+
+label{display:block;margin-top:10px;font-size:12px;font-weight:bold}
+input,select{width:100%}
+
+button{
+  width:100%;margin-top:10px;padding:8px;
+  border:0;border-radius:8px;
+  background:#1565c0;color:white;cursor:pointer
+}
+button:hover{background:#0d57aa}
+
+a{display:block;margin-top:6px;font-size:13px;color:#1565c0;text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+
+<body>
+<div id="map"></div>
+<div id="status-msg" style="
+  position: absolute; 
+  bottom: 30px; 
+  left: 50%; 
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); 
+  color: white; 
+  padding: 8px 20px; 
+  border-radius: 20px; 
+  font-size: 14px; 
+  display: none; 
+  z-index: 20;
+  pointer-events: none;">
+  Ball has come to a rest.
+</div>
+<div class="panel">
+<h2>Terrain Marble Simulator</h2>
+<p>Click map to drop a ball. Switch cinematic camera modes.</p>
+
+<label>Camera Mode</label>
+<select id="mode">
+  <option value="aerial" selected>Fixed aerial</option>  
+  <option value="chase">Chase (downhill)</option>
+  <option value="uphill">Uphill cinematic</option>
+  <option value="orbit">Side orbit</option>
+   
+</select>
+
+<label>Terrain Exaggeration</label>
+<input id="terrain" type="range" min="1" max="5" step="0.1" value="2">
+
+<label>Speed</label>
+<input id="speed" type="range" min="0.2" max="4" step="0.1" value="1.5">
+
+<button id="clear">Clear Ball</button>
+
+<div style="margin-top:10px;font-size:12px">
+<b>Examples</b>
+<a href="#" onclick="go(-4.9,57.1,13);return false;">Scottish Highlands</a>
+<a href="#" onclick="go(7.98,46.58,13);return false;">Swiss Alps</a>
+<a href="#" onclick="go(86.93,27.99,12);return false;">Everest</a>
+<a href="#" onclick="go(-112.14,36.06,12);return false;">Grand Canyon</a>
+</div>
+</div>
+
+<script>
+let ball = null;
+let anim = null;
+let speedFactor = 1.5;
+let trail = [];
+let mode = "aerial"; 
+let frameCount = 0;
+
+// Current camera "smooth" state
+let camState = {
+  center: [-4.9, 57.1],
+  bearing: 0,
+  pitch: 0,
+  zoom: 12
+};
+
+// Smoothing factor (0.01 = very slow/fluid, 0.1 = snappier)
+const lerpFactor = 0.05; 
+
+function lerp(start, end, amt) {
+  return (1 - amt) * start + amt * end;
+}    
+
+document.getElementById("mode").onchange = e => { mode = e.target.value; };
+
+const dem = new mlcontour.DemSource({
+  url: "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp",
+  encoding: "terrarium",
+  maxzoom: 12,
+  worker: true
+});
+
+dem.setupMaplibre(maplibregl);
+
+const map = new maplibregl.Map({
+  container: "map",
+  center: [-4.9, 57.1],
+  zoom: 12,
+  pitch: 65,
+  bearing: 0,
+  hash: true,
+  style: {
+    version: 8,
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    sources: {
+      "terrain-source": {
+        type: "raster-dem",
+        tiles: [dem.sharedDemProtocolUrl],
+        encoding: "terrarium",
+        tileSize: 512,
+        maxzoom: 12  
+      },
+      "hillshade-source": {
+        type: "raster-dem",
+        tiles: [dem.sharedDemProtocolUrl],
+        encoding: "terrarium",
+        tileSize: 512,
+        maxzoom: 12  
+      },
+      contours: {
+        type: "vector",
+        tiles: [
+          dem.contourProtocolUrl({
+            thresholds: { 10: [50, 250], 12: [20, 100], 14: [10, 50] },
+            elevationKey: "ele",
+            levelKey: "level",
+            contourLayer: "contours"
+          })
+        ],
+            maxzoom: 12
+      },
+      ball: { type: "geojson", data: empty() },
+      trail: { type: "geojson", data: empty() }
+    },
+    layers: [
+      {
+        id: "hill",
+        type: "hillshade",
+        source: "hillshade-source",
+        paint: { "hillshade-exaggeration": 0.5 }
+      },
+      {
+        id: "contours",
+        type: "line",
+        source: "contours",
+        "source-layer": "contours",
+        paint: { "line-color": "#9c6c2e", "line-opacity": 0.7, "line-width": 1 }
+      },
+      {
+        id: "trail",
+        type: "line",
+        source: "trail",
+        paint: { "line-color": "#1976d2", "line-width": 3 }
+      },
+      {
+        id: "ball",
+        type: "circle",
+        source: "ball",
+        paint: {
+          "circle-radius": 8,
+          "circle-color": "#e53935",
+          "circle-stroke-color": "white",
+          "circle-stroke-width": 2
+        }
+      }
+    ]
+  }
+});
+
+map.on("load", () => {
+  map.setTerrain({ source: "terrain-source", exaggeration: 2 });
+});
+
+map.on("click", e => { drop(e.lngLat.lng, e.lngLat.lat); });
+
+document.getElementById("terrain").oninput = e => {
+  map.setTerrain({ source: "terrain-source", exaggeration: +e.target.value });
+};
+
+document.getElementById("speed").oninput = e => { speedFactor = +e.target.value; };
+
+document.getElementById("clear").onclick = () => {
+  cancelAnimationFrame(anim);
+  ball = null;
+  trail = [];
+  setBall(null);
+  setTrail();
+  document.getElementById("status-msg").style.display = "none";
+};
+
+function empty() { return { type: "FeatureCollection", features: [] }; }
+
+function setBall(c) {
+  map.getSource("ball").setData({
+    type: "FeatureCollection",
+    features: c ? [{ type: "Feature", geometry: { type: "Point", coordinates: c } }] : []
+  });
+}
+
+function setTrail() {
+  map.getSource("trail").setData({
+    type: "FeatureCollection",
+    features: [{ type: "Feature", geometry: { type: "LineString", coordinates: trail } }]
+  });
+}
+
+function elev(lng, lat) { return map.queryTerrainElevation([lng, lat]); }
+function mLng(lat) { return 111320 * Math.cos(lat * Math.PI / 180); }
+function mLat() { return 111320; }
+
+function drop(lng, lat) {
+  cancelAnimationFrame(anim);
+  ball = { lng, lat, vx: 0, vy: 0 };
+  trail = [[lng, lat]];
+  setBall([lng, lat]);
+  setTrail();
+  animate();
+}
+
+function animate() {
+  const dt = 0.05;
+
+  const msg = document.getElementById("status-msg");
+  msg.style.display = "none"; // Hide message when animation starts  
+
+  function frame() {
+    frameCount++;
+    
+    const s = 0.00008;
+    const eCenter = elev(ball.lng, ball.lat); // Cache current elevation
+    
+    // Gradient calculation
+    const gx = (elev(ball.lng + s, ball.lat) - elev(ball.lng - s, ball.lat)) / (2 * s * mLng(ball.lat));
+    const gy = (elev(ball.lng, ball.lat + s) - elev(ball.lng, ball.lat - s)) / (2 * s * mLat());
+
+    const a = 42;
+    ball.vx += (-gx * a) * dt * speedFactor;
+    ball.vy += (-gy * a) * dt * speedFactor;
+    ball.vx *= 0.97;
+    ball.vy *= 0.97;
+
+    ball.lng += (ball.vx * dt) / mLng(ball.lat);
+    ball.lat += (ball.vy * dt) / mLat();
+
+    trail.push([ball.lng, ball.lat]);
+    if (trail.length > 300) trail.shift(); // Optimized trail length
+
+    setBall([ball.lng, ball.lat]);
+    
+    // Performance: Only update trail GeoJSON every 3 frames
+    if (frameCount % 3 === 0) {
+      setTrail();
+    }
+
+    camera(ball.lng, ball.lat, ball.vx, ball.vy);
+
+    if (Math.hypot(ball.vx, ball.vy) < 0.02) return;
+
+    // Calculate current speed once
+    const currentSpeed = Math.hypot(ball.vx, ball.vy);
+
+    // If speed is below threshold (0.15 is usually the "sweet spot")
+    if (currentSpeed < 0.15) {
+      ball.vx = 0;
+      ball.vy = 0;
+      msg.style.display = "block"; // Show the "At Rest" message
+      setBall([ball.lng, ball.lat]); // Final update to position
+      setTrail(); // Final update to trail
+      return; // Stop the animation loop
+    }
+
+    anim = requestAnimationFrame(frame);
+  }
+  anim = requestAnimationFrame(frame);
+}
+
+function camera(lng, lat, vx, vy) {
+  let speed = Math.hypot(vx, vy);
+  let base = Math.atan2(vx, vy) * 180 / Math.PI;
+  
+  // 1. Calculate the TARGETS (where the camera WANTS to be)
+  let targetB = 0, targetP = 0, targetZ = 13.5, targetO = [0, 0];
+
+  switch (mode) {
+    case "chase":
+      targetB = base;
+      targetP = 45 + Math.min(speed * 5, 10);
+      targetZ = 14.8 - Math.min(speed * 1.5, 2.0);
+      targetO = [0, 80];
+      break;
+    case "uphill":
+      targetB = (base + 180) % 360;
+      targetP = 55;
+      targetZ = 14.5;
+      targetO = [0, -100];
+      break;
+    case "orbit":
+      const time = performance.now() / 2000;
+      targetB = (base + 90 + (Math.sin(time) * 20)) % 360;
+      targetP = 50;
+      targetZ = 14.0;
+      targetO = [0, 0];
+      break;
+    case "aerial":
+      targetB = 0; targetP = 0; targetZ = 13.5; targetO = [0, 0];
+      break;
+  }
+
+  // 2. Smoothly interpolate the values (LERP)
+  // For bearing, we use a small trick to ensure it doesn't spin 360 degrees the wrong way
+  let shortestBearing = camState.bearing + ((((targetB - camState.bearing) % 360) + 540) % 360) - 180;
+
+  camState.center[0] = lerp(camState.center[0], lng, lerpFactor);
+  camState.center[1] = lerp(camState.center[1], lat, lerpFactor);
+  camState.bearing = lerp(camState.bearing, shortestBearing, lerpFactor);
+  camState.pitch = lerp(camState.pitch, targetP, lerpFactor);
+  camState.zoom = lerp(camState.zoom, targetZ, lerpFactor);
+
+  // 3. Apply the smoothed state
+  map.jumpTo({
+    center: camState.center,
+    bearing: camState.bearing,
+    pitch: camState.pitch,
+    zoom: camState.zoom,
+    offset: targetO 
+  });
+}
+    
+function go(lng, lat, zoom) {
+  map.flyTo({ center: [lng, lat], zoom, pitch: 65, duration: 2000 });
+  setTimeout(() => drop(lng, lat), 2200);
+}
+</script>
+</body>
+</html>
