@@ -83,11 +83,6 @@ a:hover{text-decoration:underline}
 <a href="#" onclick="go(86.93,27.99,12);return false;">Everest</a>
 <a href="#" onclick="go(-112.14,36.06,12);return false;">Grand Canyon</a>
 </div>
- <a href="https://googlemapsmania.blogspot.com/2026/05/marble-madness.html" 
-     target="_blank" 
-     style="color: #007cbf; text-decoration: none; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">
-      about
-  </a>  
 </div>
 
 <script>
@@ -242,13 +237,24 @@ function mLat() { return 111320; }
 
 function drop(lng, lat) {
   cancelAnimationFrame(anim);
+
+  // Sync smoothed camera state with actual current map view
+  const currentCenter = map.getCenter();
+
+  camState.center = [currentCenter.lng, currentCenter.lat];
+  camState.bearing = map.getBearing();
+  camState.pitch = map.getPitch();
+  camState.zoom = map.getZoom();
+
   ball = { lng, lat, vx: 0, vy: 0 };
   trail = [[lng, lat]];
+
   setBall([lng, lat]);
   setTrail();
+
   animate();
 }
-
+    
 function animate() {
   const dt = 0.05;
 
